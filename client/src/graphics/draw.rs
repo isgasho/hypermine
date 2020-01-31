@@ -564,4 +564,4 @@ struct Uniforms {
 }
 
 /// Maximum number of concurrently drawn voxel chunks
-const MAX_CHUNKS: vk::DeviceSize = 1024;
+const MAX_CHUNKS: vk::DeviceSize = 2048;
