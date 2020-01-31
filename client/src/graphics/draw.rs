@@ -177,7 +177,7 @@ impl Draw {
             let surface_extraction = SurfaceExtraction::new(gfx.clone());
             let extraction_scratch = surface_extraction::ScratchBuffer::new(
                 &surface_extraction,
-                927, // Number of dodecahedra in distance 0-3 to a given one
+                1640, // Number of cubes in distance 0-5 to a given one
                 SUBDIVISION_FACTOR as u32,
             );
 
@@ -294,7 +294,7 @@ impl Draw {
         // Perform surface extraction of in-range voxel chunks
         if self.graph.len() == 1 {
             let mut index: usize = 0;
-            self.graph.ensure_nearby(graph::NodeId::ROOT, 2);
+            self.graph.ensure_nearby(graph::NodeId::ROOT, 5); // 5 is a lot
             let mut nodes = Vec::new();
             for &node in self.graph.fresh() {
                 if self.graph.is_cube(node) {
