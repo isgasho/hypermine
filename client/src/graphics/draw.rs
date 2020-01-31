@@ -177,7 +177,7 @@ impl Draw {
             let surface_extraction = SurfaceExtraction::new(gfx.clone());
             let extraction_scratch = surface_extraction::ScratchBuffer::new(
                 &surface_extraction,
-                1640, // Number of cubes in distance 0-5 to a given one
+                1640, // Number of cubes described by nodes of length 0-5
                 SUBDIVISION_FACTOR as u32,
             );
 
