@@ -333,6 +333,44 @@ lazy_static! {
 
         result
     };
+
+    static ref VERTEX_NEIGHBORS: [[VertexNeighbor; 3]; VERTICES] = {
+        let mut result = [[VertexNeighbor { vertex: Vertex::A, incident: Side::A, opposite: Side::A }; 3]; VERTICES];
+        for v in Vertex::iter() {
+            let [a, b, c] = VERTEX_SIDES[v as usize];
+            let mut i = 0;
+            for s in Side::iter() {
+                if s == a || s == b || s == c {
+                    continue;
+                }
+                let (opposite, shared) = match (s.adjacent_to(a), s.adjacent_to(b), s.adjacent_to(c)) {
+                    (false, true, true) => (a, [b, c]),
+                    (true, false, true) => (b, [a, c]),
+                    (true, true, false) => (c, [a, b]),
+                    _ => continue,
+                };
+                result[v as usize][i] = VertexNeighbor {
+                    vertex: SIDES_TO_VERTEX[s as usize][shared[0] as usize][shared[1] as usize],
+                    incident: s,
+                    opposite,
+                };
+                i += 1;
+            }
+            assert_eq!(i, 3);
+            result[v as usize].sort_unstable_by_key(|x| x.opposite);
+        }
+        result
+    };
+}
+
+#[derive(Debug, Copy, Clone)]
+struct VertexNeighbor {
+    /// A neighbor of the original vertex
+    vertex: Vertex,
+    /// The side incident to `vertex` and not the original
+    incident: Side,
+    /// The side incident to the original and not `vertex`
+    opposite: Side,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -377,6 +415,14 @@ impl Side {
     pub fn iter() -> impl ExactSizeIterator<Item = Self> {
         use Side::*;
         [A, B, C, D, E, F, G, H, I, J, K, L].iter().cloned()
+    }
+
+    /// Whether `self` and `other` share an edge
+    ///
+    /// `false` when `self == other`.
+    #[inline]
+    fn adjacent_to(self, other: Side) -> bool {
+        ADJACENT[self as usize][other as usize]
     }
 }
 
@@ -464,6 +510,51 @@ impl Vertex {
 const VERTICES: usize = 20;
 const SIDES: usize = 12;
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct Cursor {
+    node: NodeId,
+    vertex: Vertex,
+}
+
+impl Cursor {
+    pub fn new(node: NodeId, vertex: Vertex) -> Self {
+        Self { node, vertex }
+    }
+
+    pub fn step<T>(&self, graph: &Graph<T>, dir: Dir) -> Option<Self> {
+        // For a cube identified by a dodecahedron's vertex, we identify its cubical neighbors by taking
+        // each neighboring vertex and the face incident to the original vertex but not the neighbor, and
+        // selecting the cube represented by the incident vertex in both the dodecahedron sharing the face
+        // unique to the neighbor and that sharing the face not incident to the neighbor.
+        let neighbors = VERTEX_NEIGHBORS[self.vertex as usize];
+        use Dir::*;
+        let (vertex, side) = match dir {
+            Forward => (neighbors[0].vertex, neighbors[0].opposite),
+            Back => (neighbors[0].vertex, neighbors[0].incident),
+            Up => (neighbors[1].vertex, neighbors[1].opposite),
+            Down => (neighbors[1].vertex, neighbors[1].incident),
+            Left => (neighbors[2].vertex, neighbors[2].opposite),
+            Right => (neighbors[2].vertex, neighbors[2].incident),
+        };
+        dbg!(vertex, side);
+        let node = graph.nodes[self.node.idx()].neighbors[side as usize]?;
+        // (node, vertex) now uniquely identifies a cube, but not necessarily in canonical form;
+        // `vertex` may not be incident exclusively to sides that are facing away from the
+        // origin.
+        Some(Self { node, vertex })
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum Dir {
+    Forward,
+    Back,
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -546,5 +637,22 @@ mod tests {
             assert_eq!(v, SIDES_TO_VERTEX[c as usize][a as usize][b as usize]);
             assert_eq!(v, SIDES_TO_VERTEX[c as usize][b as usize][a as usize]);
         }
+    }
+
+    #[test]
+    fn cursor() {
+        let mut graph = Graph::<()>::new();
+        graph.ensure_nearby(NodeId::ROOT, 2);
+        let start = Cursor::new(NodeId::ROOT, Vertex::A);
+        let a = start.step(&graph, Dir::Forward).unwrap();
+        assert!(a != start);
+        dbg!(a);
+        dbg!(a.step(&graph, Dir::Forward).unwrap());
+        dbg!(a.step(&graph, Dir::Back).unwrap());
+        dbg!(a.step(&graph, Dir::Left).unwrap());
+        dbg!(a.step(&graph, Dir::Right).unwrap());
+        dbg!(a.step(&graph, Dir::Up).unwrap());
+        dbg!(a.step(&graph, Dir::Down).unwrap());
+        assert_eq!(a.step(&graph, Dir::Back).unwrap(), start);
     }
 }
