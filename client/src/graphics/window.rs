@@ -191,12 +191,14 @@ impl Window {
             let frame = &swapchain.state.frames[frame_id as usize];
             // Render the frame
             let vfov = f32::consts::FRAC_PI_4;
+            let viewproj = projection(0.05, (aspect_ratio * vfov.tan()).atan(), vfov)
+                * self.sim.view().try_inverse().unwrap();
             draw.draw(
+                &mut self.sim.graph,
                 frame.buffer,
                 swapchain.state.extent,
                 frame.present,
-                projection(0.05, (aspect_ratio * vfov.tan()).atan(), vfov)
-                    * self.sim.view().try_inverse().unwrap(),
+                viewproj,
             );
             // Submit the frame to be presented on the window
             match swapchain.queue_present(frame_id) {
